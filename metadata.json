@@ -1,0 +1,5 @@
+{
+  "name": "HarvestHub",
+  "description": "A digital farmer marketplace where farmers can sell their produce directly to customers. Features include product management, order tracking, sales analytics for farmers, and a seamless shopping experience for customers with cart and order history.",
+  "requestFramePermissions": []
+}
