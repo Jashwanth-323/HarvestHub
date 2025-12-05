@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Harvesthub 11",
+  "description": "A modern, clean Digital Marketplace connecting farmers directly with customers. Browse fresh produce, manage your farm, and enjoy farm-to-table goodness.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
