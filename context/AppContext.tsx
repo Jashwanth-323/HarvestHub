@@ -308,9 +308,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
   const cartTotal = useMemo(() => cart.reduce((total, item) => total + item.product.price * item.quantity, 0), [cart]);
 
-  // --- Auth & Verification Logic ---
+  // --- Auth & Session Logic ---
   const login = useCallback((email: string, password: string, rememberMe: boolean) => {
+    // In a real production system, the password check happens on the server 
+    // after hashing the input and comparing it with a stored hash (e.g., via bcrypt).
     const foundUser = users.find(u => (u.email === email || u.mobile === email) && u.password === password);
+    
     if (foundUser) {
         if (!foundUser.isActive) {
             showNotification('Your account has been blocked.', 'error');
@@ -334,6 +337,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [user, showNotification, addAuditLog, clearCart]);
 
   const signupActual = useCallback((userData: Omit<User, 'id' | 'isActive'>): User | undefined => {
+    // Unique credential validation
     if (users.some(u => u.email === userData.email)) {
         showNotification('An account with this email already exists.', 'error');
         return undefined;
@@ -343,19 +347,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return undefined;
     }
 
+    // In a real system, userData.password would be hashed here before saving to database
     const newUser: User = {
         ...userData,
         id: `u${Date.now()}`,
         isActive: true,
-        isVerified: true, // Verification removed
+        isVerified: true,
         walletBalance: 0,
     };
     
     setUsers(prev => [...prev, newUser]);
-    setUser(newUser); // Auto-login
     
-    addAuditLog('User Signup', `New user ${newUser.fullName} registered.`, newUser);
-    showNotification(`Account created successfully!`, 'success');
+    // IMMEDIATE LOGIN AFTER SIGNUP
+    setUser(newUser);
+    
+    addAuditLog('User Signup', `New user ${newUser.fullName} registered as a ${newUser.role}.`, newUser);
+    showNotification(`Welcome, ${newUser.fullName}! Your account has been created.`, 'success');
     sendConfirmationSms(newUser.mobile, newUser.fullName).catch(console.error);
     
     return newUser;

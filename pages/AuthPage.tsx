@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useLanguage } from '../context/LanguageContext';
-import { FarmerType, UserRole, PendingUserSignupData } from '../types';
+import { UserRole, PendingUserSignupData } from '../types';
 import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '../components/icons';
 
 
@@ -15,12 +15,16 @@ const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ROLE-BASED REDIRECTION AFTER AUTH
   useEffect(() => {
     if (user) {
       let destination = location.state?.from || '/dashboard';
+      
+      // Admin/Owner always go to Admin panel
       if (user.isOwner || user.role === UserRole.Admin) {
         destination = '/admin';
       }
+      
       navigate(destination, { replace: true });
     }
   }, [user, navigate, location.state]);
@@ -52,7 +56,7 @@ const AuthPage: React.FC = () => {
   };
   
   const subtitles = {
-    login: <>{"Don't have an account?"}{' '} <button onClick={() => setView('role')} className="font-medium text-primary hover:text-primary-dark">{t('auth.signup')}</button></>,
+    login: <>{t('auth.noAccount')}{' '} <button onClick={() => setView('role')} className="font-medium text-primary hover:text-primary-dark">{t('auth.signup')}</button></>,
     role: <p className="text-sm text-gray-600">{t('auth.selectRole')}</p>,
     signup: <>{t('auth.hasAccount')}{' '} <button onClick={() => setView('login')} className="font-medium text-primary hover:text-primary-dark">{t('auth.signin')}</button></>,
   };
@@ -132,7 +136,7 @@ const LoginForm = ({ showAdminLoginHint, setShowAdminLoginHint }: { showAdminLog
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
       {showAdminLoginHint && (
-        <div className="bg-primary-dark text-white text-center p-3 rounded-md font-medium text-sm">
+        <div className="bg-primary-dark text-white text-center p-3 rounded-md font-medium text-sm border-2 border-white/20">
           {t('auth.adminDemoCredentials')}
         </div>
       )}
@@ -150,7 +154,7 @@ const LoginForm = ({ showAdminLoginHint, setShowAdminLoginHint }: { showAdminLog
       </div>
 
       <div>
-        <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-dark">
+        <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-dark transition-all transform active:scale-95">
           {t('auth.signin')}
         </button>
       </div>
@@ -165,21 +169,21 @@ const RoleSelection = ({ onSelect, onBack }: { onSelect: (role: UserRole) => voi
         <div className="space-y-4 pt-4">
             <button
                 onClick={() => onSelect(UserRole.Buyer)}
-                className="w-full text-left p-4 border rounded-lg hover:bg-light-green hover:border-primary transition-all duration-200"
+                className="w-full text-left p-4 border-2 rounded-xl hover:bg-light-green hover:border-primary transition-all duration-200 group"
             >
-                <h3 className="font-bold text-lg text-primary">{t('auth.role.buyer')}</h3>
+                <h3 className="font-bold text-lg text-gray-800 group-hover:text-primary transition-colors">{t('auth.role.buyer')}</h3>
                 <p className="text-sm text-gray-600">{t('auth.role.buyerDesc')}</p>
             </button>
             <button
                 onClick={() => onSelect(UserRole.Farmer)}
-                className="w-full text-left p-4 border rounded-lg hover:bg-light-green hover:border-primary transition-all duration-200"
+                className="w-full text-left p-4 border-2 rounded-xl hover:bg-light-green hover:border-primary transition-all duration-200 group"
             >
-                <h3 className="font-bold text-lg text-primary">{t('auth.role.farmer')}</h3>
+                <h3 className="font-bold text-lg text-gray-800 group-hover:text-primary transition-colors">{t('auth.role.farmer')}</h3>
                 <p className="text-sm text-gray-600">{t('auth.role.farmerDesc')}</p>
             </button>
             <button
                 onClick={() => onSelect(UserRole.Admin)}
-                className="w-full text-left p-4 border rounded-lg hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
+                className="w-full text-left p-4 border-2 rounded-xl hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 group"
             >
                 <h3 className="font-bold text-lg text-gray-800">{t('header.admin')}</h3>
                 <p className="text-sm text-gray-600">{t('auth.role.adminDesc')}</p>
@@ -232,7 +236,7 @@ const SignupForm = () => {
             return;
         }
         if (password.length < 6) {
-            setError('Password must be at least 8 characters long.');
+            setError('Password must be at least 6 characters long.');
             return;
         }
         if (password !== confirmPassword) {
@@ -240,33 +244,32 @@ const SignupForm = () => {
             return;
         }
         
+        // signupActual now handles auto-login internally
         signupActual(formData);
     };
 
     return (
-        <>
-            <form className="space-y-4" onSubmit={handleSubmit}>
-                <Input name="fullName" type="text" label="Full Name" placeholder="John Doe" value={formData.fullName} onChange={handleChange} required />
-                <Input name="email" type="email" label="Email Address" placeholder="you@example.com" value={formData.email} onChange={handleChange} required />
-                <Input name="mobile" type="tel" label="Phone Number" placeholder="1234567890" value={formData.mobile} onChange={handleChange} required />
-                
-                <div className="relative">
-                    <Input name="password" type={showPassword ? "text" : "password"} label="Password" placeholder="••••••••" value={formData.password} onChange={handleChange} required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 top-6 pr-3 flex items-center text-sm leading-5">
-                        {showPassword ? <EyeSlashIcon className="h-5 w-5 text-gray-500"/> : <EyeIcon className="h-5 w-5 text-gray-500"/>}
-                    </button>
-                </div>
-                <div className="relative">
-                    <Input name="confirmPassword" type={showPassword ? "text" : "password"} label="Confirm Password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required />
-                </div>
-
-                {error && <p className="text-sm text-red-600">{error}</p>}
-                
-                <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-dark">
-                    {t('auth.createAccount')}
+        <form className="space-y-4" onSubmit={handleSubmit}>
+            <Input name="fullName" type="text" label="Full Name" placeholder="John Doe" value={formData.fullName} onChange={handleChange} required />
+            <Input name="email" type="email" label="Email Address" placeholder="you@example.com" value={formData.email} onChange={handleChange} required />
+            <Input name="mobile" type="tel" label="Phone Number" placeholder="1234567890" value={formData.mobile} onChange={handleChange} required />
+            
+            <div className="relative">
+                <Input name="password" type={showPassword ? "text" : "password"} label="Password" placeholder="••••••••" value={formData.password} onChange={handleChange} required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 top-6 pr-3 flex items-center text-sm leading-5">
+                    {showPassword ? <EyeSlashIcon className="h-5 w-5 text-gray-500"/> : <EyeIcon className="h-5 w-5 text-gray-500"/>}
                 </button>
-            </form>
-        </>
+            </div>
+            <div className="relative">
+                <Input name="confirmPassword" type={showPassword ? "text" : "password"} label="Confirm Password" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required />
+            </div>
+
+            {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
+            
+            <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-dark transition-all transform active:scale-95">
+                {t('auth.createAccount')}
+            </button>
+        </form>
     );
 }
 
@@ -275,7 +278,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 const Input: React.FC<InputProps> = ({ label, ...props}) => (
     <div>
-        <label htmlFor={props.name} className="block text-sm font-medium text-gray-700">{label}</label>
+        <label htmlFor={props.name} className="block text-sm font-semibold text-gray-700">{label}</label>
         <input {...props} className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm ${props.className || ''}`} />
     </div>
 )
