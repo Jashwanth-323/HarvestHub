@@ -5,6 +5,7 @@ import { AppProvider } from '../context/AppContext';
 import { LanguageProvider } from '../context/LanguageContext';
 import { ThemeProvider } from '../context/ThemeContext'; // Import ThemeProvider
 import Header from './Header';
+import CopyrightBar from './CopyrightBar';
 import HomePage from '../pages/HomePage';
 import ProductsPage from '../pages/ProductsPage';
 import ProductDetailPage from '../pages/ProductDetailPage';
@@ -44,8 +45,9 @@ const MainContent: React.FC = () => {
     <div className="flex flex-col min-h-screen font-sans text-gray-800 dark:text-gray-100">
       <Notification />
       {!isFullScreenPage && <Header />}
+      
       <main className="flex-grow">
-       <div className={isFullScreenPage ? '' : 'max-w-screen-xl mx-auto'}> {/* Remove bg-gray-50 from here */}
+       <div className={isFullScreenPage ? '' : 'max-w-screen-xl mx-auto'}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ProductsPage />} />
@@ -59,10 +61,12 @@ const MainContent: React.FC = () => {
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/farmer-register" element={<FarmerRegistrationPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/farms/:farmerId" element={<FarmDetailPage />} /> {/* New route */}
+          <Route path="/farms/:farmerId" element={<FarmDetailPage />} />
         </Routes>
         </div>
       </main>
+
+      {!isFullScreenPage && <CopyrightBar />}
     </div>
   );
 };

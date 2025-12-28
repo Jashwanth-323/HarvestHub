@@ -1,5 +1,4 @@
 
-
 export interface Product {
   id: string;
   name: string;
@@ -10,6 +9,8 @@ export interface Product {
   unit: string; // e.g., 'kg', 'dozen', 'bunch'
   stock: number;
   farmerId: string;
+  harvestDate?: string; // New field
+  isOrganic?: boolean;   // New field
   priceHistory?: { price: number; date: string; changedBy: string; }[];
   isEnabled?: boolean;
 }
@@ -43,6 +44,7 @@ export interface Address {
   phone: string;
   street: string;
   city: string;
+  district: string; // Added district for shipping logic
   state: string;
   country: string;
   pincode: string;
@@ -62,6 +64,9 @@ export interface User {
   walletBalance?: number;
   // Farmer-specific fields
   farmLocation?: string;
+  farmDistrict?: string; // Structured location for farmers
+  farmCity?: string;     // Structured location for farmers
+  farmState?: string;    // Structured location for farmers
   farmerType?: FarmerType;
   paymentDetails?: {
     upiId: string;
@@ -81,6 +86,7 @@ export interface Order {
     farmerId: string;
     items: CartItem[];
     total: number;
+    shippingFee: number; // Added to record the specific fee paid
     date: string;
     status: OrderStatus;
     shippingAddress: Address;

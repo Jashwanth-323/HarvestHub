@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -69,29 +70,33 @@ const AuthPage: React.FC = () => {
       className="min-h-screen bg-cover bg-center"
       style={{ backgroundImage: "url('https://images.pexels.com/photos/145685/pexels-photo-145685.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2')" }}
     >
-      <div className="min-h-screen flex items-center justify-center p-4 bg-black/40">
-        <div className="absolute top-6 left-6">
-          <Link to="/" className="text-3xl font-extrabold tracking-tight text-white">
-            <span>Harvest</span><span className="font-semibold text-green-200">Hub</span>
-          </Link>
+      <div className="min-h-screen flex flex-col p-4 bg-black/40">
+        <div className="w-full flex flex-col mb-12">
+            <div className="p-6 text-center">
+                <Link to="/" className="text-3xl font-extrabold tracking-tight text-white">
+                    <span>Harvest</span><span className="font-semibold text-green-200">Hub</span>
+                </Link>
+            </div>
         </div>
 
-        <div className="w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 space-y-6">
-          <div>
-            <h2 className="text-center text-3xl font-extrabold text-gray-900">
-              {titles[view]}
-            </h2>
-            {subtitles[view] && (
-              <p className="mt-2 text-center text-sm text-gray-600">
-                {subtitles[view]}
-              </p>
-            )}
-          </div>
-          
-          {view === 'login' && <LoginForm onForgotPasswordClick={() => setView('forgotPassword')} showAdminLoginHint={showAdminLoginHint} setShowAdminLoginHint={setShowAdminLoginHint} />}
-          {view === 'role' && <RoleSelection onSelect={handleRoleSelect} onBack={handleBack} />}
-          {view === 'signup' && <SignupForm onBack={handleBack} />}
-          {view === 'forgotPassword' && <ForgotPasswordForm onBackToLoginClick={() => setView('login')} />}
+        <div className="flex-1 flex items-center justify-center">
+            <div className="w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 space-y-6">
+            <div>
+                <h2 className="text-center text-3xl font-extrabold text-gray-900">
+                {titles[view]}
+                </h2>
+                {subtitles[view] && (
+                <p className="mt-2 text-center text-sm text-gray-600">
+                    {subtitles[view]}
+                </p>
+                )}
+            </div>
+            
+            {view === 'login' && <LoginForm onForgotPasswordClick={() => setView('forgotPassword')} showAdminLoginHint={showAdminLoginHint} setShowAdminLoginHint={setShowAdminLoginHint} />}
+            {view === 'role' && <RoleSelection onSelect={handleRoleSelect} onBack={handleBack} />}
+            {view === 'signup' && <SignupForm onBack={handleBack} />}
+            {view === 'forgotPassword' && <ForgotPasswordForm onBackToLoginClick={() => setView('login')} />}
+            </div>
         </div>
       </div>
     </div>

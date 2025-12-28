@@ -8,6 +8,7 @@ import { categories } from '../data';
 import { HomeIcon, LogOutIcon, PackageIcon, ClipboardListIcon, UserCircleIcon, UserGroupIcon, ChartBarIcon, HistoryIcon, PencilIcon, TrashIcon, DownloadIcon, SparklesIcon, AlertTriangleIcon, ChartPieIcon, CreditCardIcon, CashIcon } from '../components/icons';
 import Modal from '../components/Modal';
 import FormInput from '../components/FormInput'; // Centralized FormInput
+import CopyrightBar from '../components/CopyrightBar';
 import { generateProductImage } from '../services/geminiService';
 import { getPriceSuggestions } from '../services/geminiService';
 
@@ -87,6 +88,7 @@ const ReadOnlyDashboard = () => {
                         </Link>
                     </div>
                 </main>
+                <CopyrightBar />
             </div>
         </div>
     );
@@ -103,17 +105,12 @@ const OwnerAdminDashboard = () => {
     const renderContent = () => {
         switch (activeTab) {
             case 'users': return <UserManagement />;
-            // FIX: ProductManagement component implemented below
             case 'products': return <ProductManagement />;
             case 'orders': return <AdminOrders />;
             case 'payments': return <AdminPayments />;
-            // FIX: AdminDisputes component implemented below
             case 'disputes': return <AdminDisputes />;
-            // FIX: AdminPriceMonitoring component implemented below
             case 'price-monitoring': return <AdminPriceMonitoring />;
-            // FIX: AdminAnalytics component implemented below
             case 'analytics': return <AdminAnalytics />;
-            // FIX: AuditLog component implemented below
             case 'audit': return <AuditLog />;
             default:
                 return <UserManagement />;
@@ -156,6 +153,7 @@ const OwnerAdminDashboard = () => {
                 <main className="flex-1 p-8 overflow-y-auto">
                     {renderContent()}
                 </main>
+                <CopyrightBar />
             </div>
         </div>
     );
@@ -167,7 +165,6 @@ const UserManagement = () => {
     const { allUsers, adminUpdateUserStatus, addAuditLog } = useAppContext();
     const { t } = useLanguage();
     
-    // Search and Pagination states
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const usersPerPage = 10;
@@ -189,10 +186,8 @@ const UserManagement = () => {
 
     const handleToggleStatus = (userId: string, currentStatus: boolean) => {
         adminUpdateUserStatus(userId, !currentStatus);
-        // Note: adminUpdateUserStatus already adds audit log and notification.
     }
     
-    // Simple CSV export
     const handleExport = () => {
         const headers = `${t('admin.userId')},${t('admin.fullName')},${t('admin.email')},${t('admin.role')},${t('admin.status')}\n`;
         const csv = allUsers.map(u => `${u.id},"${u.fullName}","${u.email}",${u.role},${u.isActive}`).join("\n");
@@ -326,7 +321,6 @@ const ProductManagement = () => {
         setIsModalOpen(true);
     };
 
-    // FIX: Corrected the onSave prop type to handle new products which lack an 'id'.
     const handleSave = (productData: Product | Omit<Product, 'id'>) => {
         if ('id' in productData) {
             adminUpdateProduct(productData);
@@ -445,12 +439,26 @@ const ProductManagement = () => {
 const ProductFormAdmin = ({ product, onSave, onCancel, showNotification, t }: { product: Product | null, onSave: (p: Product | Omit<Product, 'id'>) => void, onCancel: () => void, showNotification: (msg: string, type: 'success' | 'error') => void, t: (key: string, replacements?: { [key: string]: string | number }) => string }) => {
     const [formData, setFormData] = useState<Omit<Product, 'id'>>({
         name: product?.name || '', price: product?.price || 0, description: product?.description || '', imageUrl: product?.imageUrl || '',
-        category: product?.category || categories[0].name, unit: product?.unit || 'lb', stock: product?.stock || 0,
+        category: product?.category || categories[0].name, unit: product?.unit || 'kg', stock: product?.stock || 0,
+        harvestDate: product?.harvestDate || new Date().toISOString().split('T')[0],
+        isOrganic: product?.isOrganic ?? true,
         isEnabled: product?.isEnabled ?? true,
         farmerId: product?.farmerId || '', // Admin needs to set farmerId
     });
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [hasApiKey, setHasApiKey] = useState(true);
     const { farmersList } = useAppContext(); // Get farmers list for assignment
+
+    // Check for API key presence to satisfy mandatory selection for image generation
+    useEffect(() => {
+        const checkApiKey = async () => {
+            if (window.aistudio) {
+                const hasKey = await window.aistudio.hasSelectedApiKey();
+                setHasApiKey(hasKey);
+            }
+        };
+        checkApiKey();
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -463,16 +471,37 @@ const ProductFormAdmin = ({ product, onSave, onCancel, showNotification, t }: { 
             showNotification(t('common.enterProductNameForImage'), 'error');
             return;
         }
+
+        // Mandatory check for selected API key before calling image generation
+        if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+            showNotification(t('common.aiSetupRequired'), 'error');
+            return;
+        }
+
         setIsGeneratingImage(true);
         try {
             const imageUrl = await generateProductImage(formData.name);
             setFormData(prev => ({ ...prev, imageUrl }));
             showNotification(t('common.imageGeneratedSuccess'), 'success');
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            showNotification(t('common.failedToGenerateImage'), 'error');
+             // Handle common 403 or permission denied errors by resetting key state
+             if (error.message?.includes("PERMISSION_DENIED") || error.message?.includes("entity was not found")) {
+                setHasApiKey(false);
+                showNotification(t('common.aiPermissionDenied'), 'error');
+            } else {
+                showNotification(t('common.failedToGenerateImage'), 'error');
+            }
         } finally {
             setIsGeneratingImage(false);
+        }
+    };
+
+    const handleSetupApiKey = async () => {
+        if (window.aistudio) {
+            await window.aistudio.openSelectKey();
+            // Assume success per guidelines to mitigate race condition
+            setHasApiKey(true);
         }
     };
 
@@ -491,17 +520,64 @@ const ProductFormAdmin = ({ product, onSave, onCancel, showNotification, t }: { 
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <FormInput name="name" label={t('admin.productName')} value={formData.name} onChange={handleChange} required />
-            <FormInput name="price" type="number" label={t('admin.price')} value={formData.price} onChange={handleChange} required step="0.01" />
-            <FormInput name="description" label={t('admin.description')} value={formData.description} onChange={handleChange} as="textarea" />
-            <div className="flex items-end gap-2">
-                <FormInput name="imageUrl" label={t('admin.imageUrl')} value={formData.imageUrl} onChange={handleChange} className="flex-grow" />
-                <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage || !formData.name} className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-400 flex items-center space-x-2 whitespace-nowrap">
-                    <SparklesIcon className="w-5 h-5" />
-                    <span>{isGeneratingImage ? t('common.generatingImage') : t('common.aiGenerateImage')}</span>
-                </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <FormInput name="name" label={t('admin.productName')} value={formData.name} onChange={handleChange} required />
+               <FormInput name="price" type="number" label={t('admin.price')} value={formData.price} onChange={handleChange} required step="0.01" />
             </div>
-            {formData.imageUrl && <img src={formData.imageUrl} alt="preview" className="w-32 h-32 object-cover rounded-md mt-2"/>}
+            <FormInput name="description" label={t('admin.description')} value={formData.description} onChange={handleChange} as="textarea" />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormInput name="harvestDate" type="date" label={t('dashboard.harvestDate')} value={formData.harvestDate} onChange={handleChange} required />
+                <div className="flex items-center space-x-2 pt-6">
+                    <input
+                        type="checkbox"
+                        id="isOrganic"
+                        name="isOrganic"
+                        checked={formData.isOrganic}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary rounded"
+                    />
+                    <label htmlFor="isOrganic" className="text-sm font-medium text-gray-700">{t('dashboard.organic')}</label>
+                </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">{t('common.aiImageTools')}</span>
+                    {!hasApiKey && (
+                        <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                            {t('common.billingNotice')}
+                        </a>
+                    )}
+                </div>
+                <div className="flex items-end gap-2">
+                    <FormInput name="imageUrl" label={t('admin.imageUrl')} value={formData.imageUrl} onChange={handleChange} className="flex-grow" />
+                    {hasApiKey ? (
+                        <button 
+                            type="button" 
+                            onClick={handleGenerateImage} 
+                            disabled={isGeneratingImage || !formData.name} 
+                            className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-400 flex items-center space-x-2 whitespace-nowrap shadow-sm transition-all"
+                        >
+                            <SparklesIcon className="w-5 h-5" />
+                            <span>{isGeneratingImage ? t('common.generatingImage') : t('common.aiGenerateImage')}</span>
+                        </button>
+                    ) : (
+                        <button 
+                            type="button" 
+                            onClick={handleSetupApiKey} 
+                            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark flex items-center space-x-2 whitespace-nowrap shadow-sm animate-pulse"
+                        >
+                            <UserCircleIcon className="w-5 h-5" />
+                            <span>{t('common.setupAi')}</span>
+                        </button>
+                    )}
+                </div>
+                {!hasApiKey && <p className="text-[10px] text-gray-500 mt-2">{t('common.aiKeyInfo')}</p>}
+            </div>
+
+            {formData.imageUrl && <img src={formData.imageUrl} alt="preview" className="w-32 h-32 object-cover rounded-md mt-2 ring-2 ring-primary/20 shadow-sm"/>}
+            
             <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-1">
                      <label htmlFor="category" className="block text-sm font-medium text-gray-700">{t('admin.category')}</label>
@@ -512,7 +588,6 @@ const ProductFormAdmin = ({ product, onSave, onCancel, showNotification, t }: { 
                 <FormInput name="stock" type="number" label={t('admin.stock')} value={formData.stock} onChange={handleChange} required className="col-span-1" />
                 <FormInput name="unit" label={t('admin.unit')} value={formData.unit} onChange={handleChange} required className="col-span-1"/>
             </div>
-            {/* Admin can assign product to a farmer */}
             <div>
                 <label htmlFor="farmerId" className="block text-sm font-medium text-gray-700">Assign to Farmer</label>
                 <select id="farmerId" name="farmerId" value={formData.farmerId} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
@@ -542,7 +617,6 @@ const ProductFormAdmin = ({ product, onSave, onCancel, showNotification, t }: { 
 
 // --- Admin Orders Component ---
 const AdminOrders = () => {
-    // FIX: Use `allOrders` from useAppContext
     const { allOrders, allUsers, formatPrice } = useAppContext();
     const { t } = useLanguage();
 
@@ -623,25 +697,21 @@ const AdminOrders = () => {
 };
 
 // --- Admin Payments Component ---
-// Define interface for payment summary data
 interface PaymentSummaryData {
     summary: { [key: string]: number };
     totalRevenue: number;
 }
 
 const AdminPayments = () => {
-    // FIX: Use `allOrders` from useAppContext
     const { allOrders, formatPrice } = useAppContext();
     const { t } = useLanguage();
 
-    // FIX: Explicitly type the return of useMemo with PaymentSummaryData
     const paymentSummary = useMemo((): PaymentSummaryData => {
         const summary: { [key: string]: number } = {};
         let totalRevenue = 0;
 
         allOrders.forEach(order => {
             const method = order.paymentMethod || 'Unknown';
-            // FIX: Ensure `summary[method]` is treated as a number for addition
             summary[method] = (summary[method] || 0) + order.total;
             totalRevenue += order.total;
         });
@@ -657,11 +727,9 @@ const AdminPayments = () => {
                     <div>
                         <h3 className="text-xl font-semibold mb-3">{t('admin.revenueByPaymentMethod')}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* FIX: Explicitly type `total` in map callback to ensure correct type inference */}
                             {Object.entries(paymentSummary.summary).map(([method, total]: [string, number]) => (
                                 <div key={method} className="flex justify-between items-center p-4 bg-light-green rounded-lg">
                                     <span className="font-medium text-gray-700">{method}</span>
-                                    {/* FIX: Remove unnecessary 'as number' cast as 'total' is already typed */}
                                     <span className="font-bold text-primary">{formatPrice(total)}</span>
                                 </div>
                             ))}
@@ -697,7 +765,7 @@ const AdminPayments = () => {
                     </div>
                     {allOrders.length > 5 && (
                         <div className="text-center mt-4">
-                            <button onClick={() => {/* navigate to full payments report or expand */}} className="text-primary hover:underline">View All Payments</button>
+                            <button onClick={() => {}} className="text-primary hover:underline">View All Payments</button>
                         </div>
                     )}
                 </div>
@@ -818,24 +886,20 @@ const AdminAnalytics = () => {
     const { allOrders, products, allUsers, formatPrice } = useAppContext();
     const { t } = useLanguage();
 
-    // Calculate Total Sales Revenue, Total Orders, Total Products
     const totalSalesRevenue = useMemo(() => allOrders.reduce((sum, order) => sum + order.total, 0), [allOrders]);
     const totalOrders = allOrders.length;
     const totalProducts = products.length;
 
-    // Calculate Sales by Category
     const salesByCategory = useMemo(() => {
         const categorySales: { [key: string]: number } = {};
         allOrders.forEach(order => {
             order.items.forEach(item => {
                 categorySales[item.product.category] = (categorySales[item.product.category] || 0) + (item.product.price * item.quantity);
             });
-            return categorySales;
         });
         return Object.entries(categorySales).sort(([, a], [, b]) => b - a);
     }, [allOrders]);
 
-    // Calculate Farmer Performance (Top Sellers)
     const farmerPerformance = useMemo(() => {
         const farmerSales: { [key: string]: { farmerName: string, totalSales: number } } = {};
         allOrders.forEach(order => {
@@ -853,7 +917,6 @@ const AdminAnalytics = () => {
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold mb-6">{t('admin.analyticsPanel')}</h2>
 
-            {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-blue-50 p-6 rounded-lg shadow-sm">
                     <p className="text-sm font-medium text-blue-700">{t('admin.totalSalesRevenue')}</p>
@@ -869,7 +932,6 @@ const AdminAnalytics = () => {
                 </div>
             </div>
 
-            {/* Sales by Category */}
             <div className="mb-8">
                 <h3 className="text-xl font-semibold mb-4">{t('admin.salesByCategory')}</h3>
                 {salesByCategory.length > 0 ? (
@@ -884,7 +946,6 @@ const AdminAnalytics = () => {
                 ) : <p>No sales data by category yet.</p>}
             </div>
 
-            {/* Farmer Performance */}
             <div className="mb-8">
                 <h3 className="text-xl font-semibold mb-4">{t('admin.farmerPerformance')}</h3>
                 {farmerPerformance.length > 0 ? (
@@ -909,7 +970,6 @@ const AdminAnalytics = () => {
                 ) : <p>{t('admin.noFarmerPerformanceData')}</p>}
             </div>
 
-            {/* Demand Heatmap (Placeholder) */}
             <div>
                 <h3 className="text-xl font-semibold mb-4">{t('admin.demandHeatmap')}</h3>
                 <div className="bg-gray-50 p-6 rounded-lg shadow-sm text-center">

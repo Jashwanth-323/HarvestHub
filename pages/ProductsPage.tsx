@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { categories } from '../data'; // Import farmers
@@ -19,6 +20,8 @@ const ProductsPage: React.FC = () => {
   const [selectedFarmer, setSelectedFarmer] = useState(farmerFromUrl || 'All'); // New: State for selected farmer
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name-asc');
+  const [organicOnly, setOrganicOnly] = useState(false);
+  const [inStockOnly, setInStockOnly] = useState(false);
   
   useEffect(() => {
     setSelectedCategory(categoryFromUrl || 'All');
@@ -47,6 +50,14 @@ const ProductsPage: React.FC = () => {
       );
     }
 
+    if (organicOnly) {
+      filtered = filtered.filter(p => p.isOrganic === true);
+    }
+
+    if (inStockOnly) {
+      filtered = filtered.filter(p => p.stock > 0);
+    }
+
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'price-asc':
@@ -60,7 +71,7 @@ const ProductsPage: React.FC = () => {
           return a.name.localeCompare(b.name);
       }
     });
-  }, [selectedCategory, selectedFarmer, searchTerm, sortBy, products]); // Add selectedFarmer to dependency array
+  }, [selectedCategory, selectedFarmer, searchTerm, sortBy, products, organicOnly, inStockOnly]); // Add selectedFarmer to dependency array
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
@@ -138,6 +149,30 @@ const ProductsPage: React.FC = () => {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
+
+          <div className="mb-6 space-y-3">
+             <div className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="organic" 
+                  checked={organicOnly} 
+                  onChange={e => setOrganicOnly(e.target.checked)}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <label htmlFor="organic" className="ml-2 block text-sm text-gray-700">{t('products.organicOnly')}</label>
+             </div>
+             <div className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="instock" 
+                  checked={inStockOnly} 
+                  onChange={e => setInStockOnly(e.target.checked)}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <label htmlFor="instock" className="ml-2 block text-sm text-gray-700">{t('products.inStock')}</label>
+             </div>
+          </div>
+
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">{t('products.category')}</h3>
             <ul className="space-y-2">
@@ -209,7 +244,7 @@ const ProductsPage: React.FC = () => {
              <div className="text-center py-20 bg-white rounded-2xl shadow-lg border">
                 <h3 className="text-2xl font-semibold text-gray-700">No Products Found</h3>
                 <p className="text-gray-500 mt-2">Try adjusting your filters or selecting another category.</p>
-                <button onClick={() => { handleCategoryChange('All'); handleFarmerChange('All'); }} className="mt-4 text-primary font-semibold hover:underline">Clear Filters</button>
+                <button onClick={() => { handleCategoryChange('All'); handleFarmerChange('All'); setOrganicOnly(false); setInStockOnly(false); }} className="mt-4 text-primary font-semibold hover:underline">Clear Filters</button>
              </div>
           )}
         </main>

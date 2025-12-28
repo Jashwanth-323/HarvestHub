@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { 
   CartItem, Product, User, UserRole, Order, OrderStatus, AuditLog, FarmerType, Address, PendingUserSignupData 
@@ -6,12 +7,21 @@ import {
   getInitialProducts, addOrder as addOrderData, getOrdersByCustomerId, getProductsByFarmerId, getOrdersByFarmerId, 
   addProduct as addProductData, updateProduct as updateProductData, deleteProduct as deleteProductData, getInitialOrders
 } from '../data';
-import { sendConfirmationSms } from '../services/smsService'; // Import SMS service
+import { sendConfirmationSms } from '../services/smsService';
 import { useLanguage } from './LanguageContext';
 
 type NotificationType = {
   message: string;
   type: 'success' | 'error';
+};
+
+// --- Storage Keys ---
+const STORAGE_KEYS = {
+  PRODUCTS: 'hh_persistent_products',
+  ORDERS: 'hh_persistent_orders',
+  USERS: 'hh_persistent_users',
+  CURRENCY: 'currency',
+  LOGGED_USER: 'hh_active_session'
 };
 
 // --- Currency Definitions ---
@@ -29,14 +39,46 @@ const exchangeRates: { [key: string]: number } = {
     GBP: 0.79,
 };
 
-// Initial users data (deep copy to prevent direct mutation from other parts of the app)
-const initialUsers: User[] = JSON.parse(JSON.stringify([
-  { id: 'u1', fullName: 'John Doe', email: 'buyer@example.com', password: 'password123', mobile: '1234567890', role: UserRole.Buyer, isActive: true, deliveryAddress: { fullName: 'John Doe', phone: '1234567890', street: '123 Main St', city: 'Anytown', state: 'California', country: 'USA', pincode: '12345' }, walletBalance: 100 },
-  { id: 'u2', fullName: 'Jane Farmer', email: 'farmer@example.com', password: 'password123', mobile: '0987654321', role: UserRole.Farmer, isActive: true, farmLocation: 'Green Valley', farmerType: FarmerType.Vegetables, paymentDetails: { upiId: 'jane@farm' } },
-  { id: 'u3', fullName: 'Market Owner', email: 'owner@example.com', password: 'password123', mobile: '5555555555', role: UserRole.Buyer, isActive: true, isOwner: true, deliveryAddress: { fullName: 'Market Owner', phone: '5555555555', street: '1 Market Rd', city: 'Big City', state: 'New York', country: 'USA', pincode: '54321' } },
-  { id: 'u_admin', fullName: 'Admin User', email: 'admin@example.com', password: 'admin@123', mobile: '1112223334', role: UserRole.Admin, isActive: true, isOwner: true }, // Added Admin User
-]));
-
+// Initial users data
+const initialUsers: User[] = [
+  { 
+    id: 'u1', 
+    fullName: 'John Doe', 
+    email: 'buyer@example.com', 
+    password: 'password123', 
+    mobile: '1234567890', 
+    role: UserRole.Buyer, 
+    isActive: true, 
+    deliveryAddress: { 
+        fullName: 'John Doe', 
+        phone: '1234567890', 
+        street: '123 Main St', 
+        city: 'Bengaluru', 
+        district: 'Bengaluru Urban', 
+        state: 'Karnataka', 
+        country: 'India', 
+        pincode: '560001' 
+    }, 
+    walletBalance: 100 
+  },
+  { 
+    id: 'u2', 
+    fullName: 'Jane Farmer', 
+    email: 'farmer@example.com', 
+    password: 'password123', 
+    mobile: '0987654321', 
+    role: UserRole.Farmer, 
+    isActive: true, 
+    farmLocation: 'Green Valley, Mysuru', 
+    farmCity: 'Mysuru',
+    farmDistrict: 'Mysuru',
+    farmState: 'Karnataka',
+    farmerType: FarmerType.Vegetables, 
+    paymentDetails: { upiId: 'jane@farm' } 
+  },
+  { id: 'u3', fullName: 'Market Owner', email: 'owner@example.com', password: 'password123', mobile: '5555555555', role: UserRole.Buyer, isActive: true, isOwner: true, deliveryAddress: { fullName: 'Market Owner', phone: '5555555555', street: '1 Market Rd', city: 'Big City', district: 'Big District', state: 'New York', country: 'USA', pincode: '54321' } },
+  { id: 'u_admin', fullName: 'Admin User', email: 'admin@example.com', password: 'admin@123', mobile: '1112223334', role: UserRole.Admin, isActive: true, isOwner: true },
+];
 
 interface AppContextType {
   cart: CartItem[];
@@ -47,33 +89,30 @@ interface AppContextType {
   buyNow: (product: Product, quantity: number) => void;
   cartCount: number;
   cartTotal: number;
+  shippingFee: number;
+  updateShippingLocation: (address: Partial<Address>) => void;
   notification: NotificationType | null;
   showNotification: (message: string, type: 'success' | 'error') => void;
-  products: Product[]; // Global list of products
-  // Currency
+  products: Product[];
   currency: string;
   setCurrency: (currency: string) => void;
   formatPrice: (price: number) => string;
-  // User Auth & Management
   user: User | null;
   login: (email: string, password: string, rememberMe: boolean) => void;
   logout: () => void;
-  signupActual: (userData: Omit<User, 'id' | 'isActive'>) => User | undefined; // The actual signup logic
+  signupActual: (userData: Omit<User, 'id' | 'isActive'>) => User | undefined;
   forgotPassword: (email: string) => void;
   updateUserProfile: (userData: User) => void;
-  // Orders
   placeOrder: (shippingAddress: Address, paymentMethod: string) => boolean;
-  customerOrders: Order[]; // Derived from global orders
-  allOrders: Order[]; // All orders for admin views
-  // Farmer Dashboard
-  farmerProducts: Product[]; // Derived from global products
-  farmerOrders: Order[]; // Derived from global orders
+  customerOrders: Order[];
+  allOrders: Order[];
+  farmerProducts: Product[];
+  farmerOrders: Order[];
   farmerAddProduct: (productData: Omit<Product, 'id' | 'farmerId'>) => void;
   farmerUpdateProduct: (productData: Product) => void;
   farmerDeleteProduct: (productId: string) => void;
-  // Admin
-  allUsers: User[]; // Global list of users for admin
-  farmersList: User[]; // List of all farmer users
+  allUsers: User[];
+  farmersList: User[];
   adminUpdateUserStatus: (userId: string, newStatus: boolean) => void;
   adminAddProduct: (productData: Omit<Product, 'id'>) => void;
   adminUpdateProduct: (productData: Product) => void;
@@ -85,42 +124,75 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { t } = useLanguage();
+  
+  // --- Persistent State Initialization ---
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+    return saved ? JSON.parse(saved) : getInitialProducts();
+  });
+
+  const [orders, setOrders] = useState<Order[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.ORDERS);
+    return saved ? JSON.parse(saved) : getInitialOrders();
+  });
+
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+    return saved ? JSON.parse(saved) : initialUsers;
+  });
+
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.LOGGED_USER);
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [notification, setNotification] = useState<NotificationType | null>(null);
-  const [currency, setCurrencyState] = useState(localStorage.getItem('currency') || 'USD');
-  const { t } = useLanguage(); // Use language context for translations
-  
-  // Centralized state for global data
-  const [products, setProducts] = useState<Product[]>(getInitialProducts());
-  const [orders, setOrders] = useState<Order[]>(getInitialOrders());
-  const [users, setUsers] = useState<User[]>(initialUsers); // Full list of all users
-  const [user, setUser] = useState<User | null>(null); // Currently logged-in user
+  const [currency, setCurrencyState] = useState(localStorage.getItem(STORAGE_KEYS.CURRENCY) || 'USD');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  
-  // Update allUsers whenever 'users' state changes (for admin view)
+  const [shippingFee, setShippingFee] = useState(0);
+
+  // --- Persistence Sync Hooks ---
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+  }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+  }, [orders]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+    }
+  }, [user]);
+
+  // Derived list of all users and farmers
   const allUsers = useMemo(() => users, [users]);
-  // Derived list of farmer users
   const farmersList = useMemo(() => users.filter(u => u.role === UserRole.Farmer), [users]);
 
-
-  // Effects for notification auto-hide
+  // --- Utility Functions ---
   useEffect(() => {
     if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 3000);
+      const timer = setTimeout(() => setNotification(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [notification]);
 
-  // --- Utility Functions (memoized) ---
   const showNotification = useCallback((message: string, type: 'success' | 'error') => {
     setNotification({ message, type });
   }, []);
   
   const setCurrency = useCallback((curr: string) => {
     if (currencies[curr]) {
-        localStorage.setItem('currency', curr);
+        localStorage.setItem(STORAGE_KEYS.CURRENCY, curr);
         setCurrencyState(curr);
     }
   }, []);
@@ -145,65 +217,96 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAuditLogs(prev => [log, ...prev]);
   }, [user]);
 
-  // --- Cart Management (memoized) ---
+  // --- Shipping ---
+  const calculateShippingFee = useCallback((buyerAddress: Partial<Address>) => {
+    if (!cart.length) return 0;
+    const farmerId = cart[0].product.farmerId;
+    const farmer = users.find(u => u.id === farmerId);
+    if (!farmer) return 0.60;
+
+    let feeInINR = 120;
+    const bCity = (buyerAddress.city || '').toLowerCase().trim();
+    const bDist = (buyerAddress.district || '').toLowerCase().trim();
+    const bState = (buyerAddress.state || '').toLowerCase().trim();
+    const fCity = (farmer.farmCity || '').toLowerCase().trim();
+    const fDist = (farmer.farmDistrict || '').toLowerCase().trim();
+    const fState = (farmer.farmState || '').toLowerCase().trim();
+
+    if (bCity && fCity && bCity === fCity) feeInINR = 30;
+    else if (bDist && fDist && bDist === fDist) feeInINR = 50;
+    else if (bState && fState && bState === fState) feeInINR = 80;
+
+    return feeInINR / exchangeRates['INR'];
+  }, [cart, users]);
+
+  const updateShippingLocation = useCallback((address: Partial<Address>) => {
+    const fee = calculateShippingFee(address);
+    setShippingFee(fee);
+  }, [calculateShippingFee]);
+
+  useEffect(() => {
+    if (user?.deliveryAddress) updateShippingLocation(user.deliveryAddress);
+    else setShippingFee(0);
+  }, [cart, user?.deliveryAddress, updateShippingLocation]);
+
+  // --- Cart Management ---
   const addToCart = useCallback((product: Product, quantity: number) => {
+    const latestProduct = products.find(p => p.id === product.id);
+    if (!latestProduct || latestProduct.stock <= 0) {
+      showNotification(t('dashboard.outOfStock'), 'error');
+      return;
+    }
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.product.id === product.id);
+      const currentQtyInCart = existingItem ? existingItem.quantity : 0;
+      if (currentQtyInCart + quantity > latestProduct.stock) {
+        showNotification(t('dashboard.onlyAvailable', { count: latestProduct.stock, unit: latestProduct.unit }), 'error');
+        return prevCart;
+      }
       if (existingItem) {
         return prevCart.map(item =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
-      return [...prevCart, { product, quantity }];
+      return [...prevCart, { product: latestProduct, quantity }];
     });
     showNotification(`${product.name} added to cart`, 'success');
-  }, [showNotification]);
+  }, [showNotification, products, t]);
 
   const removeFromCart = useCallback((productId: string) => {
     setCart(prevCart => prevCart.filter(item => item.product.id !== productId));
   }, []);
 
   const updateQuantity = useCallback((productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
-    } else {
+    const latestProduct = products.find(p => p.id === productId);
+    if (!latestProduct) return;
+    if (quantity > latestProduct.stock) {
+      showNotification(t('dashboard.onlyAvailable', { count: latestProduct.stock, unit: latestProduct.unit }), 'error');
+      return;
+    }
+    if (quantity <= 0) removeFromCart(productId);
+    else {
       setCart(prevCart =>
-        prevCart.map(item =>
-          item.product.id === productId ? { ...item, quantity } : item
-        )
+        prevCart.map(item => item.product.id === productId ? { ...item, quantity } : item)
       );
     }
-  }, [removeFromCart]);
+  }, [removeFromCart, products, showNotification, t]);
 
   const clearCart = useCallback(() => setCart([]), []);
   
   const buyNow = useCallback((product: Product, quantity: number) => {
-    setCart([{ product, quantity }]);
-  }, []);
+    const latestProduct = products.find(p => p.id === product.id);
+    if (!latestProduct || latestProduct.stock < quantity) {
+      showNotification(t('dashboard.onlyAvailable', { count: latestProduct?.stock || 0, unit: latestProduct?.unit || '' }), 'error');
+      return;
+    }
+    setCart([{ product: latestProduct, quantity }]);
+  }, [products, showNotification, t]);
 
   const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
   const cartTotal = useMemo(() => cart.reduce((total, item) => total + item.product.price * item.quantity, 0), [cart]);
 
-  // --- Derived State for Dashboards (memoized) ---
-  const customerOrders = useMemo(() => {
-    if (!user || user.role !== UserRole.Buyer) return [];
-    return getOrdersByCustomerId(orders, user.id);
-  }, [user, orders]);
-
-  const farmerProducts = useMemo(() => {
-    if (!user || user.role !== UserRole.Farmer) return [];
-    return getProductsByFarmerId(products, user.id);
-  }, [user, products]);
-
-  const farmerOrders = useMemo(() => {
-    if (!user || user.role !== UserRole.Farmer) return [];
-    return getOrdersByFarmerId(orders, user.id);
-  }, [user, orders]);
-
-
-  // --- User Authentication & Profile (memoized) ---
+  // --- Auth ---
   const login = useCallback((email: string, password: string, rememberMe: boolean) => {
     const foundUser = users.find(u => u.email === email && u.password === password);
     if (foundUser) {
@@ -214,14 +317,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setUser(foundUser);
         showNotification(`Welcome back, ${foundUser.fullName}!`, 'success');
         addAuditLog('User Login', `User ${foundUser.fullName} logged in.`, foundUser);
-        
-        if (rememberMe) {
-            localStorage.setItem('rememberedUser', email);
-        } else {
-            localStorage.removeItem('rememberedUser');
-        }
+        if (rememberMe) localStorage.setItem('rememberedUser', email);
+        else localStorage.removeItem('rememberedUser');
     } else {
-        showNotification('Invalid email or password.', 'error');
+        showNotification('Invalid credentials.', 'error');
     }
   }, [users, showNotification, addAuditLog]);
 
@@ -232,54 +331,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showNotification('You have been logged out.', 'success');
   }, [user, showNotification, addAuditLog, clearCart]);
 
-
   const signupActual = useCallback((userData: Omit<User, 'id' | 'isActive'>): User | undefined => {
     if (users.some(u => u.email === userData.email)) {
         showNotification('An account with this email already exists.', 'error');
         return undefined;
     }
-    // Prevent self-registration for Admin role for security reasons
-    if (userData.role === UserRole.Admin) { 
-        return undefined;
-    }
-
     const newUser: User = {
         ...userData,
         id: `u${Date.now()}`,
         isActive: true,
         walletBalance: 0,
     };
-    
     setUsers(prev => [...prev, newUser]);
-    setUser(newUser); // Automatically log in the new user
+    setUser(newUser);
     addAuditLog('User Signup', `New user ${newUser.fullName} registered as a ${newUser.role}.`, newUser);
     showNotification(t('auth.signupSuccess', {fullName: newUser.fullName}), 'success');
-    
-    // Send confirmation SMS
-    sendConfirmationSms(newUser.mobile, newUser.fullName)
-        .then(success => {
-            if (success) {
-                // SMS success notification removed as per request
-            } else {
-                // SMS error notification removed as per request
-            }
-        })
-        .catch(err => {
-            console.error("Error sending SMS:", err);
-            // SMS error notification removed as per request
-        });
-
+    sendConfirmationSms(newUser.mobile, newUser.fullName).catch(console.error);
     return newUser;
   }, [users, showNotification, addAuditLog, t]);
 
-
   const forgotPassword = useCallback((email: string) => {
     const foundUser = users.find(u => u.email === email);
-    if (foundUser) {
-        showNotification(`Password reset instructions sent to ${email}. (This is a demo)`, 'success');
-    } else {
-        showNotification(`No account found for ${email}.`, 'error');
-    }
+    if (foundUser) showNotification(`Password reset link sent to ${email}.`, 'success');
+    else showNotification(`No account found for ${email}.`, 'error');
   }, [users, showNotification]);
 
   const updateUserProfile = useCallback((userData: User) => {
@@ -290,134 +364,105 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showNotification('Profile updated successfully.', 'success');
   }, [user, showNotification, addAuditLog]);
 
-  // --- Order Management (memoized) ---
+  // --- Orders ---
   const placeOrder = useCallback((shippingAddress: Address, paymentMethod: string): boolean => {
-    if (!user || cart.length === 0) {
-      showNotification('Cannot place order. Your cart is empty or you are not logged in.', 'error');
-      return false;
+    if (!user || cart.length === 0) return false;
+    for (const item of cart) {
+      const productInStore = products.find(p => p.id === item.product.id);
+      if (!productInStore || productInStore.stock < item.quantity) {
+        showNotification(t('dashboard.insufficientStock', { productName: item.product.name }), 'error');
+        return false;
+      }
     }
-    
-    const farmerIdForOrder = cart[0].product.farmerId; // Simplified: assumes all from one farmer
-    
+
+    const totalCost = cartTotal + shippingFee;
     if (paymentMethod === 'wallet' && user.walletBalance !== undefined) {
-        const totalCost = cartTotal + 5.00; // including shipping
         if (user.walletBalance < totalCost) {
             showNotification('Insufficient wallet balance.', 'error');
             return false;
         }
-        // Deduct from wallet and update user
         const updatedUser = { ...user, walletBalance: user.walletBalance - totalCost };
         setUser(updatedUser);
         setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
     }
 
-    const newOrderData: Omit<Order, 'id'> = {
+    const newOrderData: Order = {
+      id: `ord${Date.now()}`,
       customerId: user.id,
-      farmerId: farmerIdForOrder,
-      items: cart,
-      total: cartTotal + 5.00, // including shipping
+      farmerId: cart[0].product.farmerId,
+      items: [...cart],
+      total: totalCost,
+      shippingFee,
       date: new Date().toISOString(),
       status: OrderStatus.Confirmed,
       shippingAddress,
       paymentMethod,
     };
     
-    // Use pure addOrderData from data.ts and update local state
-    setOrders(prevOrders => {
-      const newOrdersArray = addOrderData(prevOrders, newOrderData);
-      const createdOrder = newOrdersArray.find(o => o.customerId === user.id && o.date === newOrderData.date); // Find the newly added order
-      addAuditLog('Order Placed', `User ${user.fullName} placed order #${createdOrder?.id.substring(3, 9) || 'N/A'}.`, user);
-      return newOrdersArray;
-    });
-    
+    setProducts(prevProducts => prevProducts.map(p => {
+        const cartItem = cart.find(item => item.product.id === p.id);
+        return cartItem ? { ...p, stock: Math.max(0, p.stock - cartItem.quantity) } : p;
+    }));
+
+    setOrders(prev => [newOrderData, ...prev]);
+    addAuditLog('Order Placed', `User ${user.fullName} placed order #${newOrderData.id.substring(3, 9)}.`, user);
     clearCart();
     showNotification('Order placed successfully!', 'success');
     return true;
-  }, [user, cart, cartTotal, showNotification, addAuditLog, clearCart, setUsers, setOrders]);
+  }, [user, cart, cartTotal, shippingFee, showNotification, addAuditLog, clearCart, products, t]);
 
-  // --- Admin Functions (memoized) ---
-  const adminUpdateUserStatus = useCallback((userId: string, newStatus: boolean) => {
-    const userToUpdate = users.find(u => u.id === userId);
-    if (userToUpdate) {
-        setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: newStatus } : u));
-        // If the updated user is the currently logged-in user, also update the 'user' state
-        if (user && user.id === userId) {
-            setUser(prevUser => prevUser ? { ...prevUser, isActive: newStatus } : null);
-        }
-        addAuditLog('User Status Change', `User ${userToUpdate.fullName} status changed to ${newStatus ? 'Active' : 'Blocked'}.`, user || undefined);
-        showNotification('User status updated.', 'success');
-    }
-  }, [users, user, showNotification, addAuditLog]);
+  // Derived Dashboard Data
+  const customerOrders = useMemo(() => user ? orders.filter(o => o.customerId === user.id) : [], [user, orders]);
+  const farmerProducts = useMemo(() => user ? products.filter(p => p.farmerId === user.id) : [], [user, products]);
+  const farmerOrders = useMemo(() => user ? orders.filter(o => o.farmerId === user.id) : [], [user, orders]);
 
-  const adminAddProduct = useCallback((productData: Omit<Product, 'id'>) => {
-    setProducts(prevProducts => {
-      const newProductsArray = addProductData(prevProducts, productData);
-      const newProduct = newProductsArray.find(p => p.name === productData.name && p.farmerId === productData.farmerId); // Find by unique attributes or assume last added
-      addAuditLog('Product Added', `Admin added product: ${newProduct?.name || 'N/A'}.`, user || undefined);
-      return newProductsArray;
-    });
-    showNotification('Product added successfully.', 'success');
-  }, [showNotification, addAuditLog, setProducts, user]);
-
-  const adminUpdateProduct = useCallback((productData: Product) => {
-    setProducts(prevProducts => {
-      const updatedProductsArray = updateProductData(prevProducts, productData);
-      addAuditLog('Product Updated', `Admin updated product: ${productData.name}.`, user || undefined);
-      return updatedProductsArray;
-    });
-    showNotification('Product updated successfully.', 'success');
-  }, [showNotification, addAuditLog, setProducts, user]);
-
-  const adminDeleteProduct = useCallback((productId: string) => {
-    const productName = products.find(p => p.id === productId)?.name;
-    setProducts(prevProducts => {
-      const newProductsArray = deleteProductData(prevProducts, productId);
-      addAuditLog('Product Deleted', `Admin deleted product: ${productName} (ID: ${productId}).`, user || undefined);
-      return newProductsArray;
-    });
-    showNotification('Product deleted successfully.', 'success');
-  }, [showNotification, addAuditLog, setProducts, products, user]);
-  
-  // --- Farmer Product Management (memoized) ---
+  // --- Farmer Product Management ---
   const farmerAddProduct = useCallback((productData: Omit<Product, 'id' | 'farmerId'>) => {
     if (!user || user.role !== UserRole.Farmer) return;
-    setProducts(prevProducts => {
-      const newProductsArray = addProductData(prevProducts, { ...productData, farmerId: user.id });
-      const newProduct = newProductsArray.find(p => p.name === productData.name && p.farmerId === user.id);
-      addAuditLog('Product Added', `Farmer ${user.fullName} added product: ${newProduct?.name || 'N/A'}.`, user);
-      return newProductsArray;
-    });
+    const newProd = { ...productData, id: `p${Date.now()}`, farmerId: user.id };
+    setProducts(prev => [newProd, ...prev]);
+    addAuditLog('Product Added', `Farmer added product: ${newProd.name}.`, user);
     showNotification('Product added successfully.', 'success');
-  }, [user, showNotification, addAuditLog, setProducts]);
+  }, [user, addAuditLog, showNotification]);
   
   const farmerUpdateProduct = useCallback((productData: Product) => {
-    if (!user || user.role !== UserRole.Farmer || productData.farmerId !== user.id) return;
-    setProducts(prevProducts => {
-      const updatedProductsArray = updateProductData(prevProducts, productData);
-      addAuditLog('Product Updated', `Farmer ${user.fullName} updated product: ${productData.name}.`, user);
-      return updatedProductsArray;
-    });
-    showNotification('Product updated successfully.', 'success');
-  }, [user, showNotification, addAuditLog, setProducts]);
+    setProducts(prev => prev.map(p => p.id === productData.id ? productData : p));
+    showNotification('Product updated.', 'success');
+  }, [showNotification]);
 
   const farmerDeleteProduct = useCallback((productId: string) => {
-    if (!user || user.role !== UserRole.Farmer) return;
-    const productToDelete = products.find(p => p.id === productId && p.farmerId === user.id);
-    if (!productToDelete) return;
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    showNotification('Product deleted.', 'success');
+  }, [showNotification]);
 
-    setProducts(prevProducts => {
-      const newProductsArray = deleteProductData(prevProducts, productId);
-      addAuditLog('Product Deleted', `Farmer ${user.fullName} deleted product: ${productToDelete.name}.`, user);
-      return newProductsArray;
-    });
-    showNotification('Product deleted successfully.', 'success');
-  }, [user, products, showNotification, addAuditLog, setProducts]);
+  // --- Admin ---
+  const adminUpdateUserStatus = useCallback((userId: string, newStatus: boolean) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: newStatus } : u));
+    if (user?.id === userId) setUser(prev => prev ? { ...prev, isActive: newStatus } : null);
+    showNotification('User status updated.', 'success');
+  }, [user, showNotification]);
 
+  const adminAddProduct = useCallback((productData: Omit<Product, 'id'>) => {
+    const newProd = { ...productData, id: `p${Date.now()}` };
+    setProducts(prev => [newProd, ...prev]);
+    showNotification('Product added.', 'success');
+  }, [showNotification]);
+
+  const adminUpdateProduct = useCallback((productData: Product) => {
+    setProducts(prev => prev.map(p => p.id === productData.id ? productData : p));
+    showNotification('Product updated.', 'success');
+  }, [showNotification]);
+
+  const adminDeleteProduct = useCallback((productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    showNotification('Product deleted.', 'success');
+  }, [showNotification]);
 
   return (
     <AppContext.Provider
       value={{
         cart, addToCart, removeFromCart, updateQuantity, clearCart, buyNow, cartCount, cartTotal,
+        shippingFee, updateShippingLocation,
         notification, showNotification,
         products,
         currency, setCurrency, formatPrice,
@@ -435,8 +480,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
+  if (context === undefined) throw new Error('useAppContext must be used within a AppProvider');
   return context;
 };

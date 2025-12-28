@@ -2,14 +2,12 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Product, PriceSuggestion } from '../types';
 
-// The API key is read from the environment variable `process.env.API_KEY`.
-// It is assumed to be pre-configured and available in the execution context.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export async function* generateRecipeStream(productName: string) {
+    // Create instance right before use to pick up the latest API key
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
         const stream = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: `Provide a simple and delicious recipe using ${productName}. The recipe should be easy for a beginner cook. Format it with a title, a short description, ingredients list, and step-by-step instructions. Use markdown for formatting.`,
         });
 
@@ -25,6 +23,7 @@ export async function* generateRecipeStream(productName: string) {
 
 
 export async function getPriceSuggestions(products: Product[]): Promise<PriceSuggestion[]> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `You are a pricing expert for a digital farmer's market. Analyze the following product data. Suggest new prices to optimize sales. Generally, items with high stock (e.g., > 50) should have a slight discount, and items with low stock (e.g., < 20) could have a slight price increase. Provide a brief reason for each suggestion.
 
     Product Data:
@@ -33,7 +32,7 @@ export async function getPriceSuggestions(products: Product[]): Promise<PriceSug
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -61,18 +60,19 @@ export async function getPriceSuggestions(products: Product[]): Promise<PriceSug
 }
 
 export async function generateProductImage(prompt: string): Promise<string> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
         const fullPrompt = `A professional, clean product photograph of ${prompt}, on a simple, light-colored background. The image should look realistic and appealing for an e-commerce site.`;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-2.5-flash-image', // Switched to default model for better compatibility
             contents: {
                 parts: [{ text: fullPrompt }],
             },
             config: {
                 imageConfig: {
-                    aspectRatio: "1:1",
-                    imageSize: "1K" // Use 1K for standard generation
+                    aspectRatio: "1:1"
+                    // imageSize is only for gemini-3-pro-image-preview
                 },
             },
         });
@@ -86,16 +86,17 @@ export async function generateProductImage(prompt: string): Promise<string> {
             }
         }
         
-        // If no image part is found, throw an error.
         throw new Error("AI did not return an image.");
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error generating product image:", error);
-        throw new Error("Failed to generate image with AI.");
+        // Handle specific permission error logic if needed
+        throw error;
     }
 }
 
 export async function findFarmsNear(latitude: number, longitude: number): Promise<GenerateContentResponse> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { categories } from '../data';
@@ -11,7 +12,10 @@ const HomePage: React.FC = () => {
   const { user, products } = useAppContext(); // Access products from context
   const featuredProductIds = ['p2', 'p5', 'p7', 'p11'];
   const featuredProducts = products.filter(p => featuredProductIds.includes(p.id));
-  const grainsProducts = products.filter(p => p.category === 'Grains').slice(0, 4); // Show first 4
+  
+  const vegetableProducts = products.filter(p => p.category === 'Vegetables').slice(0, 4);
+  const fruitProducts = products.filter(p => p.category === 'Fruits').slice(0, 4);
+  const grainsProducts = products.filter(p => p.category === 'Grains').slice(0, 4);
 
   const handleShopNow = () => {
     if (user) {
@@ -57,6 +61,36 @@ const HomePage: React.FC = () => {
                   <h3 className="text-2xl font-semibold text-white">{category.name}</h3>
                 </div>
               </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Vegetables Section */}
+      <section className="py-16 bg-light-green/30">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center mb-10">
+            <h2 className="text-3xl font-bold text-gray-800">{t('home.vegetables.title')}</h2>
+            <Link to="/shop?category=Vegetables" className="text-primary font-bold hover:underline">View All</Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {vegetableProducts.map(product => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Fruits Section */}
+      <section className="py-16">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center mb-10">
+            <h2 className="text-3xl font-bold text-gray-800">{t('home.fruits.title')}</h2>
+            <Link to="/shop?category=Fruits" className="text-primary font-bold hover:underline">View All</Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {fruitProducts.map(product => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </div>

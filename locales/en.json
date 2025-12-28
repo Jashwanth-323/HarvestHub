@@ -28,6 +28,12 @@
     },
     "grains": {
       "title": "Our Grains Selection"
+    },
+    "vegetables": {
+      "title": "Fresh Vegetables"
+    },
+    "fruits": {
+      "title": "Local Fruits"
     }
   },
   "auth": {
@@ -96,7 +102,19 @@
     "productStock": "Stock",
     "productStatus": "Status",
     "enabled": "Enabled",
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "outOfStock": "Out of Stock",
+    "onlyAvailable": "Only {{count}} {{unit}} available",
+    "insufficientStock": "Insufficient stock for {{productName}}. Please adjust your cart.",
+    "lowStockAlertTitle": "Low Stock Attention Required",
+    "lowStockAlertMessage": "You have {{count}} active product(s) falling below the minimum threshold (10 units). Consider restocking soon to avoid service interruptions.",
+    "harvestDate": "Harvest Date",
+    "organic": "Organic",
+    "totalProducts": "Total Products",
+    "lowStock": "Low Stock",
+    "pendingOrders": "Pending Orders",
+    "allProducts": "All Products",
+    "showLowStockOnly": "Show Low Stock Only"
   },
   "admin": {
     "readOnlyView": "Admin View (Read-Only)",
@@ -189,7 +207,10 @@
     "browse": "Browse our collection of farm-fresh products.",
     "category": "Category",
     "farmer": "Farmer",
-    "allFarmers": "All Farmers"
+    "allFarmers": "All Farmers",
+    "organicOnly": "Organic Only",
+    "availability": "Availability",
+    "inStock": "In Stock"
   },
   "farmDetail": {
     "notFoundTitle": "Farm Not Found",
@@ -238,6 +259,13 @@
     "close": "Close",
     "previous": "Previous",
     "next": "Next",
-    "generating": "Generating..."
+    "generating": "Generating...",
+    "aiSetupRequired": "AI Image Generation requires a personal API Key. Please click 'Setup AI'.",
+    "setupAi": "Setup AI API Key",
+    "aiPermissionDenied": "Permission Denied. Your API key may not have access to high-quality image models. Please check billing or select a valid key.",
+    "billingNotice": "Billing Docs",
+    "aiImageTools": "AI Image Lab",
+    "aiKeyInfo": "Using your own API key ensures you have dedicated generation quota.",
+    "soldOut": "Sold Out"
   }
 }
